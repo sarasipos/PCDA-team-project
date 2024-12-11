@@ -1,0 +1,39 @@
+---
+title: "Group Project PCDA"
+author: 
+output:
+  html_document: null
+  pdf_document: default
+editor_options:
+  chunk_output_type: console
+---
+```{r}
+library(printr)
+library(knitr)
+library(tidyverse)
+library(ggplot2)
+```
+
+```{r}
+ESS_data<-read.csv("~/AUC/Political data analysis/team project/ESS11.csv") |>
+  filter(cntry=="PL", vote == 1) |>
+  select(idno, PSPeoplesay="psppsgva", PSPeopleinfluence= "psppipla",CanParticpate = "cptppola" , trustinparl= "trstprl", trustinlegal= "trstlgl", trustpoliticans= "trstplt", trustparties= "trstprt", vote, Partyvoted="prtvtfpl", Partyclosest="prtcljpl", Howclose="prtdgcl", SatisfiedwithNGov="stfgov", ShouldHavemanyfewImmFromMaj="imsmetn", ShouldHavemanyfewImmfromMin="imdfetn", ShouldhavemanyfewImmfromPooroutsideEurope="impcntr", ImmagrationgoodbadEconomy="imbgeco", Immgoodbadforculture="imueclt", ImmworsebetterforlivinginPL="imwbcnt", dscrrce, dscrntn, dscrrlg, dscrlng, dscretn)
+```
+
+grouping and cleaning data for party support
+```{r}
+ESS_data1 <- ESS_data|> 
+  filter(Partyvoted <= 5)|>
+  mutate(Partyvoted = recode(Partyvoted, '1' ='Koalicja Obywatelska', '2' =	'Prawo i Sprawiedliwość', '3' ='Trzecia Droga','4'='Nowa Lewica', '5' =	'Konfederacja Wolność i Niepodległość'))
+
+ESS_data2 <- ESS_data1|>
+  filter(Partyclosest<=8) |>
+  mutate(Partyclosest = recode(Partyclosest, '1'='Platforma Obywatelska', '2'='Prawo i Sprawiedliwość', '3'='Lewica Razem', '4'= 'Konfederacja Wolność i Niepodległość', '5'='Nowa Lewica', '6'='Polskie Stronnictwo Ludowe', '7'='Suwerenna Polska','8'='Polska 2050'))
+```
+
+```{r}
+ggplot(ESS_data2, aes(x=Partyclosest)) +
+  geom_bar(aes('fill' = Partyvoted), position= 'fill')
+```````
+
+
