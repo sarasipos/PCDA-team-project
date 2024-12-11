@@ -1,0 +1,21 @@
+---
+title: "Group Project PCDA"
+author: 
+output:
+  html_document: null
+  pdf_document: default
+editor_options:
+  chunk_output_type: console
+---
+```{r}
+library(printr)
+library(knitr)
+library(tidyverse)
+```
+
+```{r}
+ESS_data<-read.csv("~/AUC/Political data analysis/team project/ESS11.csv") |>
+  filter(cntry=="PL") |>
+  select(idno, PSPeoplesay="psppsgva", PSPeopleinfluence= "psppipla",CanParticpate = "cptppola" , trustinparl= "trstprl", trustinlegal= "trstlgl", trustpoliticans= "trstplt", trustparties= "trstprt", vote, Partyvoted="prtvtfpl", Partyclosest="prtcljpl", Howclose="prtdgcl", SatisfiedwithNGov="stfgov", ShouldHavemanyfewImmFromMaj="imsmetn", ShouldHavemanyfewImmfromMin="imdfetn", ShouldhavemanyfewImmfromPooroutsideEurope="impcntr", ImmagrationgoodbadEconomy="imbgeco", Immgoodbadforculture="imueclt", ImmworsebetterforlivinginPL="imwbcnt", dscrrce, dscrntn, dscrrlg, dscrlng, dscretn)
+```
+
