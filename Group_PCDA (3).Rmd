@@ -1,0 +1,116 @@
+---
+title: "Group Project PCDA"
+author: 
+output:
+  html_document: null
+  pdf_document: default
+editor_options:
+  chunk_output_type: console
+---
+```{r}
+library(printr)
+library(knitr)
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+```
+
+```{r}
+ESS_data<-read.csv("~/AUC/Political data analysis/team project/ESS11.csv") |>
+  filter(cntry=="PL", vote == 1) |>
+  select(idno, PSPeoplesay="psppsgva", PSPeopleinfluence= "psppipla",CanParticpate = "cptppola" , trustinparl= "trstprl", trustinlegal= "trstlgl", trustpoliticans= "trstplt", trustparties= "trstprt", vote, Partyvoted="prtvtfpl", Partyclosest="prtcljpl", Howclose="prtdgcl", SatisfiedwithNGov="stfgov", ShouldHavemanyfewImmFromMaj="imsmetn", ShouldHavemanyfewImmfromMin="imdfetn", ShouldhavemanyfewImmfromPooroutsideEurope="impcntr", ImmagrationgoodbadEconomy="imbgeco", Immgoodbadforculture="imueclt", ImmworsebetterforlivinginPL="imwbcnt", dscrrce, dscrntn, dscrrlg, dscrlng, dscretn, clsprty)
+```
+
+grouping and cleaning data for party support
+```{r}
+ESS_data1 <- ESS_data|> 
+  filter(Partyvoted <= 5)|>
+  mutate(Partyvoted = recode(Partyvoted, '1' ='Koalicja Obywatelska', '2' =	'Prawo i Sprawiedliwość', '3' ='Trzecia Droga','4'='Nowa Lewica', '5' =	'Konfederacja Wolność i Niepodległość'))
+
+ESS_data2 <- ESS_data1|>
+  filter(Partyclosest<=8) |>
+  mutate(Partyclosest = recode(Partyclosest, '1'='Platforma Obywatelska', '2'='Prawo i Sprawiedliwość', '3'='Lewica Razem', '4'= 'Konfederacja Wolność i Niepodległość', '5'='Nowa Lewica', '6'='Polskie Stronnictwo Ludowe', '7'='Suwerenna Polska','8'='Polska 2050'))
+
+ESS_data2$Partyclosest = factor(ESS_data2$Partyclosest, levels=c(
+  "Platforma Obywatelska", 
+  "Prawo i Sprawiedliwość",
+  "Polska 2050",
+  "Nowa Lewica",
+  "Konfederacja Wolność i Niepodległość",
+  "Polskie Stronnictwo Ludowe",
+  "Suwerenna Polska",
+  "Lewica Razem"
+  ))
+```
+
+
+Making variables for immigration support (the lower the number, the more support)
+```{r}
+ESS_data2<- ESS_data2 |>
+  filter(ShouldHavemanyfewImmFromMaj<=4,ShouldHavemanyfewImmfromMin<=4,ShouldhavemanyfewImmfromPooroutsideEurope<=4, ImmagrationgoodbadEconomy<=10,Immgoodbadforculture<=10, ImmworsebetterforlivinginPL<=10)|>
+    mutate(ImmagrationgoodbadEconomy=(10-ImmagrationgoodbadEconomy),ImmworsebetterforlivinginPL=(10-ImmworsebetterforlivinginPL),Immgoodbadforculture=(10-Immgoodbadforculture))|>
+  mutate(Immsum=(ShouldHavemanyfewImmfromMin+ShouldhavemanyfewImmfromPooroutsideEurope+ImmagrationgoodbadEconomy+Immgoodbadforculture+ImmworsebetterforlivinginPL))|>
+  mutate(Immavg=Immsum/5)
+```
+
+Graph did good :)
+```{r}
+ESS_data2|>
+  group_by(Partyvoted)|>
+ggplot(aes(x=Partyvoted, y=Immsum))+
+  geom_boxplot()+
+  ggtitle("Distribution of Support for Immigration by Party Voted for") +
+  ylab("Support for Immigration (Low is high support, High is low support)") +
+  xlab("Party Voted for in Last National Election")
+
+ESS_data2|>
+  group_by(Partyvoted)|>
+ggplot(aes(x=Partyclosest, y=Immsum))+
+  geom_boxplot()+
+  ggtitle("Distribution of Support for Immigration by Favored Party for") +
+  ylab("Support for Immigration (Low is high support, High is low support)") +
+  xlab("Favored Party of Voter")
+
+```
+```{r}
+m = lm(ESS_data2$Immsum ~ ESS_data2$Partyvoted)
+summary(m)
+
+m1=lm(ESS_data2$Immsum ~ ESS_data2$Partyclosest)
+summary(m1)
+```
+
+This correlation test shows that as distrust in government grows, so does distrust in political parties. It seems though that distrust in goverment grows faster than distrust in political parties? (correlation is 0.5, not 1?)
+```{r}
+ESS_data2<-ESS_data2|>
+  mutate(TrustGovsum=(trustinparl+trustinlegal+trustpoliticans), TrustGovavg=TrustGovsum/3)
+  cor.test(ESS_data2$TrustGovavg, ESS_data2$trustparties)
+  cor.test(ESS_data2$TrustGovsum, ESS_data2$trustparties)
+```
+
+This shows no party has a majority that is very close, at least not with a high number of respondents
+```{r}
+ESS_data3<-ESS_data2|>
+  filter(clsprty==1)|>
+  filter(Howclose<=6)
+ggplot(ESS_data3, aes(x=Partyclosest, y=Howclose, fill=Partyclosest))+
+  geom_boxplot(outlier.shape = NA, show.legend=FALSE)+
+  geom_jitter(alpha=0.5, show.legend=FALSE)+
+  ggtitle("How Close Voters are to their Preferred Party") +
+  ylab("How Close they Feel to the Party (1=Very, 4=Not at all)") +
+  xlab("Party Voter Feels Closest To")
+```
+
+P value not small enough to be significant
+```{r}
+#group_by(ESS_data2, Partyvoted)|>
+cor.test(ESS_data2$Immsum, ESS_data2$TrustGovsum)
+```
+
+
+```{r}
+ggplot(ESS_data2, aes(x=Partyclosest)) +
+  geom_bar(aes('fill' = Partyvoted), position= 'fill')
+```````
+
+
