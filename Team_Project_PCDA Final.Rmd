@@ -1,0 +1,234 @@
+---
+title: "Team Project PCDA"
+author: Julia Lukuc, Sara Sipos, Abriana Ferguson
+output:
+  html_document: null
+  pdf_document: default
+editor_options:
+  chunk_output_type: console
+---
+```{r}
+library(printr)
+library(knitr)
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+
+library(rvest)
+library(tidytext)
+library(tokenizers)
+library(stopwords)
+library(stringr)
+library(ggwordcloud)
+```
+
+
+European Social Survey Analysis
+```{r}
+ESS_data<-read.csv("~/AUC/Political data analysis/team project/ESS11.csv") |>
+  filter(cntry=="PL", vote == 1) |>
+  select(idno, PSPeoplesay="psppsgva", PSPeopleinfluence= "psppipla",CanParticpate = "cptppola" , trustinparl= "trstprl", trustinlegal= "trstlgl", trustpoliticans= "trstplt", trustparties= "trstprt", vote, Partyvoted="prtvtfpl", Partyclosest="prtcljpl", Howclose="prtdgcl", SatisfiedwithNGov="stfgov", ShouldHavemanyfewImmFromMaj="imsmetn", ShouldHavemanyfewImmfromMin="imdfetn", ShouldhavemanyfewImmfromPooroutsideEurope="impcntr", ImmagrationgoodbadEconomy="imbgeco", Immgoodbadforculture="imueclt", ImmworsebetterforlivinginPL="imwbcnt", dscrrce, dscrntn, dscrrlg, dscrlng, dscretn, clsprty)
+```
+
+Grouping and cleaning data for party support
+```{r}
+ESS_data1 <- ESS_data|> 
+  filter(Partyvoted <= 5)|>
+  mutate(Partyvoted = recode(Partyvoted, '1' ='Koalicja Obywatelska', '2' =	'Prawo i Sprawiedliwość', '3' ='Trzecia Droga','4'='Nowa Lewica', '5' =	'Konfederacja Wolność i Niepodległość'))
+
+ESS_data2 <- ESS_data1|>
+  filter(Partyclosest<=8) |>
+  mutate(Partyclosest = recode(Partyclosest, '1'='Platforma Obywatelska', '2'='Prawo i Sprawiedliwość', '3'='Lewica Razem', '4'= 'Konfederacja Wolność i Niepodległość', '5'='Nowa Lewica', '6'='Polskie Stronnictwo Ludowe', '7'='Suwerenna Polska','8'='Polska 2050'))
+
+ESS_data2$Partyclosest = factor(ESS_data2$Partyclosest, levels=c(
+  "Platforma Obywatelska", 
+  "Prawo i Sprawiedliwość",
+  "Polska 2050",
+  "Nowa Lewica",
+  "Konfederacja Wolność i Niepodległość",
+  "Polskie Stronnictwo Ludowe",
+  "Suwerenna Polska",
+  "Lewica Razem"
+  ))
+```
+
+Making variables for immigration support (the lower the number, the more support)
+```{r}
+ESS_data2<- ESS_data2 |>
+  filter(ShouldHavemanyfewImmFromMaj<=4,ShouldHavemanyfewImmfromMin<=4,ShouldhavemanyfewImmfromPooroutsideEurope<=4, ImmagrationgoodbadEconomy<=10,Immgoodbadforculture<=10, ImmworsebetterforlivinginPL<=10)|>
+    mutate(ImmagrationgoodbadEconomy=(10-ImmagrationgoodbadEconomy),ImmworsebetterforlivinginPL=(10-ImmworsebetterforlivinginPL),Immgoodbadforculture=(10-Immgoodbadforculture))|>
+  mutate(Immsum=(ShouldHavemanyfewImmfromMin+ShouldhavemanyfewImmfromPooroutsideEurope+ImmagrationgoodbadEconomy+Immgoodbadforculture+ImmworsebetterforlivinginPL))|>
+  mutate(Immavg=Immsum/5)
+```
+
+Graph did good :)
+```{r}
+ESS_data2|>
+  group_by(Partyvoted)|>
+ggplot(aes(x=Partyvoted, y=Immsum))+
+  geom_boxplot()+
+  ggtitle("Distribution of Support for Immigration by Party Voted for") +
+  ylab("Support for Immigration (Low is high support, High is low support)") +
+  xlab("Party Voted for in Last National Election")
+
+ESS_data2|>
+  group_by(Partyvoted)|>
+ggplot(aes(x=Partyclosest, y=Immsum))+
+  geom_boxplot()+
+  ggtitle("Distribution of Support for Immigration by Favored Party for") +
+  ylab("Support for Immigration (Low is high support, High is low support)") +
+  xlab("Favored Party of Voter")
+
+```
+```{r}
+m = lm(ESS_data2$Immsum ~ ESS_data2$Partyvoted)
+summary(m)
+
+m1=lm(ESS_data2$Immsum ~ ESS_data2$Partyclosest)
+summary(m1)
+```
+
+This correlation test shows that as distrust in government grows, so does distrust in political parties. It seems though that distrust in goverment grows faster than distrust in political parties? (correlation is 0.5, not 1?)
+```{r}
+ESS_data2<-ESS_data2|>
+  mutate(TrustGovsum=(trustinparl+trustinlegal+trustpoliticans), TrustGovavg=TrustGovsum/3)
+  cor.test(ESS_data2$TrustGovavg, ESS_data2$trustparties)
+  cor.test(ESS_data2$TrustGovsum, ESS_data2$trustparties)
+```
+
+This shows no party has a majority that is very close, at least not with a high number of respondents
+```{r}
+ESS_data3<-ESS_data2|>
+  filter(clsprty==1)|>
+  filter(Howclose<=6)
+ggplot(ESS_data3, aes(x=Partyclosest, y=Howclose, fill=Partyclosest))+
+  geom_boxplot(outlier.shape = NA, show.legend=FALSE)+
+  geom_jitter(alpha=0.5, show.legend=FALSE)+
+  ggtitle("How Close Voters are to their Preferred Party") +
+  ylab("How Close they Feel to the Party (1=Very, 4=Not at all)") +
+  xlab("Party Voter Feels Closest To")
+```
+
+P value not small enough to be significant
+```{r}
+#group_by(ESS_data2, Partyvoted)|>
+cor.test(ESS_data2$Immsum, ESS_data2$TrustGovsum)
+```
+
+```{r}
+ggplot(ESS_data2, aes(x=Partyclosest)) +
+  geom_bar(aes('fill' = Partyvoted), position= 'fill')
+```
+
+
+
+
+
+Debates Analysis
+```{debate input}
+html <- read_html('https://oko.press/co-mowili-kandydaci-w-tvp-zapis-debaty-wyborczej') 
+```
+
+```{debate text}
+texts <- html |> 
+  html_elements('p[class="typography__paragraph my-5 font-serif font-normal text-xl leading-8 text-gray-900 dark:text-gray-50 print:dark:text-black break-words"]') |>
+  html_text2()
+
+debate <- tibble(text=texts)
+print(debate)
+```
+
+Selecting only the debate question about migration policy:
+```{migration question}
+migration_debate <- debate |> 
+  slice(6:20)
+print(migration_debate)
+```
+
+Cleaning the data for further text analysis:
+```{cleaning and tokenizing}
+tok_debate <- migration_debate |> 
+  unnest_tokens(word, text, to_lower=F, strip_punct=F)
+print(tok_debate)
+
+tok_debate |>
+  group_by(word) |> 
+  summarize(n=n()) |> 
+  arrange(-n) |> 
+  head()
+
+other_stopwords <- c("Za", "My", "moich", "takim", "prze", "przodu", "po", "co", "przyp")
+mystopwords <- stopwords(language = 'pl', source = 'stopwords-iso')
+allstopwords <- unique(c(mystopwords, other_stopwords))
+
+debate_clean <- tok_debate |>
+  filter(!word %in% allstopwords) |>
+  mutate(word = str_replace_all(word, "[[:punct:]]", "")) |>
+  mutate(word = str_replace_all(word, "[[:digit:]]", "")) |>
+  filter(str_trim(word) != "") |>
+  mutate(doc_id = row_number()) 
+  
+debate_clean |>
+  pull(word) |>
+  head()
+```
+
+Decided not to trim any words as the statements in the debate are quite short and there are not many words that are frequently used.
+
+Calculating frequencies of words used in the debate by PiS representative:
+```{PiS frequencies in debate}
+PiS_answer <- debate_clean |>
+  slice(406:474)
+
+total_terms <- nrow(debate_clean)
+
+freq_PiS <- PiS_answer |>
+  group_by(word) |>
+  summarize(termfreq=n(), 
+            relfreq = termfreq / total_terms) |>
+  arrange(-relfreq) 
+print(freq_PiS)
+```
+
+Visualising wordcloud for PiS statement:
+```{PiS wordcloud}
+freq_PiS |> 
+  ggplot() + 
+  geom_text_wordcloud(aes(label = word, size = termfreq, color = relfreq), 
+                      family = "sans") +
+  scale_size_area(max_size = 5) +  
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+Calculating frequencies of words used in the debate by KO representative:
+```{KO frequencies in debate}
+KO_answer <- debate_clean |>
+  slice(82:143)
+
+freq_KO <- KO_answer |>
+  group_by(word) |>
+  summarize(termfreq=n(), 
+            relfreq = termfreq / total_terms) |>
+  arrange(-relfreq) 
+print(freq_KO)
+```
+
+Visualising wordcloud for KO statement:
+```{KO wordcloud}
+freq_KO |> 
+  ggplot() + 
+  geom_text_wordcloud(aes(label = word, size = termfreq, color = relfreq), 
+                      family = "sans") +
+  scale_size_area(max_size = 5) +  
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+
+
+
+
+Political Manifestos Analysis
+
+
